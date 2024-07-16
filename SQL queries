@@ -1,0 +1,203 @@
+Выборка проектов
+___________________
+SELECT Project_DB_ID, COUNT(*) 
+FROM [RevitElementsParameters ].dbo.File_DB 
+GROUP BY Project_DB_ID 
+ORDER BY Project_DB_ID 
+
+Среднее распределение файлов по проектам
+___________________
+SELECT AVG(project_count) as avg_project_count
+FROM (
+    SELECT Project_DB_ID, COUNT(*) as project_count
+    FROM [RevitElementsParameters ].dbo.File_DB
+    GROUP BY Project_DB_ID
+) as project_counts;
+
+Получение статуса проекта
+___________________
+SELECT Status, COUNT(*)
+FROM RevitElementsParameters.dbo.Project_DB
+GROUP BY Status 
+
+Получение актуальных проектов
+___________________
+SELECT PDB.Name, COUNT(*) as count
+FROM RevitElementsParameters.dbo.Project_DB as PDB
+INNER JOIN RevitElementsParameters.dbo.File_DB as FDB
+ON PDB.ID = FDB.Project_DB_ID
+WHERE Status <> 'Не выгружать'
+GROUP BY PDB.Name 
+ORDER BY count DESC
+
+Получение элементов объекта Верейская раздела Конструктив
+___________________
+SELECT COUNT(*)
+FROM RevitElementsParameters.dbo.Project_DB as PDB
+INNER JOIN RevitElementsParameters.dbo.File_DB as FDB
+ON PDB.ID = FDB.Project_DB_ID
+INNER JOIN RevitElementsParameters.dbo.ElementDtoType as EDT
+ON FDB.Id = EDT.FileDbId
+INNER JOIN RevitElementsParameters.dbo.Categories as CAT
+ON EDT.CategoryId = CAT.BuiltInCategoryId
+INNER JOIN RevitElementsParameters.dbo.ElementDtoInstance as EDI
+ON EDI.FileDbId = EDT.FileDbId AND EDI.TypeId = EDT.ElementIdDto
+WHERE FDB.Name LIKE '%_КР_%' AND EDT.CategoryId <> -1 
+AND PDB.Name = 'Верейская вл.41_1' AND EDT.ELementIdDto <> -1
+
+Получение типов объекта Верейская раздела Конструктив
+___________________
+SELECT COUNT(*)
+FROM RevitElementsParameters.dbo.Project_DB as PDB
+INNER JOIN RevitElementsParameters.dbo.File_DB as FDB
+ON PDB.ID = FDB.Project_DB_ID
+INNER JOIN RevitElementsParameters.dbo.ElementDtoType as EDT
+ON FDB.Id = EDT.FileDbId
+WHERE FDB.Name LIKE '%_КР_%' AND EDT.CategoryId <> -1 
+AND PDB.Name = 'Верейская вл.41_1' AND EDT.ELementIdDto <> -1
+
+Получение объекта Верейская раздела Конструктив с сортировкой по категориям
+___________________
+SELECT CAT.Name, COUNT(*) as count 
+FROM RevitElementsParameters.dbo.Project_DB as PDB
+INNER JOIN RevitElementsParameters.dbo.File_DB as FDB
+ON PDB.ID = FDB.Project_DB_ID
+INNER JOIN RevitElementsParameters.dbo.ElementDtoType as EDT
+ON FDB.Id = EDT.FileDbId
+INNER JOIN RevitElementsParameters.dbo.Categories as CAT
+ON EDT.CategoryId = CAT.BuiltInCategoryId
+WHERE FDB.Name LIKE '%_КР_%' AND EDT.CategoryId <> '-1'
+GROUP BY CAT.Name
+ORDER BY count DESC 
+
+Получение объекта Верейская раздела Конструктив категории Несущая арматура
+___________________
+SELECT EDT.FamilyName, EDT.Name, COUNT(*) as count
+FROM RevitElementsParameters.dbo.Project_DB as PDB
+INNER JOIN RevitElementsParameters.dbo.File_DB as FDB
+ON PDB.ID = FDB.Project_DB_ID
+INNER JOIN RevitElementsParameters.dbo.ElementDtoType as EDT
+ON FDB.Id = EDT.FileDbId
+INNER JOIN RevitElementsParameters.dbo.Categories as CAT
+ON EDT.CategoryId = CAT.BuiltInCategoryId
+INNER JOIN RevitElementsParameters.dbo.ElementDtoInstance as EDI
+ON EDI.FileDbId = EDT.FileDbId AND EDI.TypeId = EDT.ElementIdDto
+WHERE FDB.Name LIKE '%_КР_%' AND EDT.CategoryId <> -1 
+AND PDB.Name = 'Верейская вл.41_1' AND EDT.ELementIdDto <> -1
+AND CAT.Name = 'Несущая арматура'
+GROUP BY EDT.FamilyName, EDT.Name
+ORDER BY EDT.FamilyName, EDT.Name, count DESC
+
+
+Получение процентного соотноешения семейств для объекта Верейская раздела конструктив
+___________________
+SELECT 
+    EDT.FamilyName, 
+    EDT.Name, 
+    COUNT(FamilyName) as count,
+    (COUNT(*) * 100.0 / 
+        (SELECT COUNT(*)
+         FROM RevitElementsParameters.dbo.Project_DB as PDB
+         INNER JOIN RevitElementsParameters.dbo.File_DB as FDB
+         ON PDB.ID = FDB.Project_DB_ID
+         INNER JOIN RevitElementsParameters.dbo.ElementDtoType as EDT
+         ON FDB.Id = EDT.FileDbId
+         INNER JOIN RevitElementsParameters.dbo.Categories as CAT
+         ON EDT.CategoryId = CAT.BuiltInCategoryId
+         INNER JOIN RevitElementsParameters.dbo.ElementDtoInstance as EDI
+         ON EDI.FileDbId = EDT.FileDbId AND EDI.TypeId = EDT.ElementIdDto
+         WHERE FDB.Name LIKE '%_КР_%' AND EDT.CategoryId <> -1 
+         AND PDB.Name = 'Верейская вл.41_1' AND EDT.ELementIdDto <> -1 
+        )
+    ) AS percentage
+FROM 
+    RevitElementsParameters.dbo.Project_DB as PDB
+INNER JOIN RevitElementsParameters.dbo.File_DB as FDB
+ON PDB.ID = FDB.Project_DB_ID
+INNER JOIN RevitElementsParameters.dbo.ElementDtoType as EDT
+ON FDB.Id = EDT.FileDbId
+INNER JOIN RevitElementsParameters.dbo.Categories as CAT
+ON EDT.CategoryId = CAT.BuiltInCategoryId
+INNER JOIN RevitElementsParameters.dbo.ElementDtoInstance as EDI
+ON EDI.FileDbId = EDT.FileDbId AND EDI.TypeId = EDT.ElementIdDto
+WHERE FDB.Name LIKE '%_КР_%' AND EDT.CategoryId <> -1 
+AND PDB.Name = 'Верейская вл.41_1' AND EDT.ELementIdDto <> -1
+GROUP BY EDT.FamilyName, EDT.Name
+ORDER BY percentage DESC
+
+
+Оптимизированный запрос для работы с данными
+___________________
+SELECT Category, COUNT(*)
+FROM (SELECT FDB.Name FileName, 
+		EDT.Name TypeName, 
+		EDT.FamilyName FamilyName, 
+		CAT.Name Category
+FROM RevitElementsParameters.dbo.Project_DB as PDB
+INNER JOIN (SELECT *
+			FROM RevitElementsParameters.dbo.File_DB as FDB
+			WHERE FDB.Name LIKE '%_АР_%') as FDB
+ON PDB.ID = FDB.Project_DB_ID
+INNER JOIN (SELECT *
+			FROM RevitElementsParameters.dbo.ElementDtoType as EDT
+			WHERE EDT.CategoryId <> -1 AND EDT.CategoryId <> -2000111) as EDT
+ON FDB.Id = EDT.FileDbId
+INNER JOIN (SELECT *
+			FROM RevitElementsParameters.dbo.Categories as CAT
+			WHERE CAT.CategoryType <> 'Internal') as CAT
+ON EDT.CategoryId = CAT.BuiltInCategoryId) as Result
+GROUP BY Category
+ORDER BY COUNT(*) DESC
+
+Оптимизированный запрос для получеия популярных категорий в моделях нужного раздела
+___________________
+SELECT Category, COUNT(*) count
+FROM (SELECT FDB.Name FileName, 
+		EDT.Name TypeName, 
+		EDT.FamilyName FamilyName, 
+		CAT.Name Category
+FROM RevitElementsParameters.dbo.Project_DB as PDB
+INNER JOIN (SELECT *
+			FROM RevitElementsParameters.dbo.File_DB as FDB
+			WHERE FDB.Name LIKE '%_КР_%') as FDB
+ON PDB.ID = FDB.Project_DB_ID
+INNER JOIN (SELECT *
+			FROM RevitElementsParameters.dbo.ElementDtoType as EDT
+			WHERE EDT.CategoryId <> -1 AND EDT.CategoryId <> -2000111) as EDT
+ON FDB.Id = EDT.FileDbId
+INNER JOIN (SELECT *
+			FROM RevitElementsParameters.dbo.Categories as CAT
+			WHERE CAT.CategoryType <> 'Internal') as CAT
+ON EDT.CategoryId = CAT.BuiltInCategoryId) as Result
+GROUP BY Category
+ORDER BY count DESC
+
+Запрос для формирования csv. файла для BI отчета 
+___________________
+SELECT Category, FileName, TypeName, FamilyName, COUNT(*) count
+FROM (SELECT FDB.Name FileName, 
+		EDT.Name TypeName, 
+		EDT.FamilyName FamilyName, 
+		CAT.Name Category
+FROM RevitElementsParameters.dbo.Project_DB as PDB
+INNER JOIN (SELECT *
+			FROM RevitElementsParameters.dbo.File_DB as FDB
+			) as FDB
+ON PDB.ID = FDB.Project_DB_ID
+INNER JOIN (SELECT *
+			FROM RevitElementsParameters.dbo.ElementDtoType as EDT
+			WHERE EDT.CategoryId <> -1 AND EDT.CategoryId <> -2000111) as EDT
+ON FDB.Id = EDT.FileDbId
+INNER JOIN (SELECT *
+			FROM RevitElementsParameters.dbo.Categories as CAT
+			WHERE CAT.CategoryType <> 'Internal') as CAT
+ON EDT.CategoryId = CAT.BuiltInCategoryId) as Result
+WHERE (Category != 'Связанные файлы' 
+	AND  Category != 'Растровые изображения'
+	AND Category != 'Формы'
+	AND Category != 'Армирование по площади несущей конструкции'
+	AND Category != 'Армирование по траектории несущей конструкции'
+	AND Category != 'Уровни')
+GROUP BY Category, FileName, TypeName, FamilyName
+ORDER BY count DESC
+
